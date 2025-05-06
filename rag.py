@@ -1,14 +1,21 @@
 # rag.py
 
+import os
 import numpy as np
 import pickle
+import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
-import os
 
-# Load your OpenAI API key from .env
-load_dotenv()
-client = OpenAI()
+# Load .env if running locally; otherwise use Streamlit secrets on Cloud
+if not st.secrets.get("OPENAI_API_KEY"):
+    load_dotenv()
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+else:
+    openai_api_key = st.secrets["OPENAI_API_KEY"]
+
+# Initialize OpenAI client
+client = OpenAI(api_key=openai_api_key)
 
 # Load saved FAISS index, raw documents, and full record rows
 with open("kb.pkl", "rb") as f:
@@ -69,4 +76,4 @@ def generate_answer(query):
         messages=messages
     )
 
-    return response.choices[0].message.content
+    return response.choices[0].message.content.strip()
