@@ -3,7 +3,7 @@
 import streamlit as st
 from rag import generate_answer
 
-st.set_page_config(page_title="Bionexa Lab Assistant", page_icon="🧬")
+st.set_page_config(page_title="Bionexa RAG Assistant")
 
 st.title("🧬 Bionexa Lab Assistant")
 st.markdown("Ask about our tests, turnaround time, sample drop-off, or preparation.")

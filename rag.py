@@ -1,18 +1,18 @@
 # rag.py
 
 import os
-import pickle
 import numpy as np
+import pickle
+import openai
 from dotenv import load_dotenv
-from openai import OpenAI
 
-# Load environment variables
+# Load environment variables (only needed locally)
 load_dotenv()
 
-# Set up OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Set the OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Load the FAISS index and records
+# Load saved FAISS index, raw documents, and full record rows
 with open("kb.pkl", "rb") as f:
     index, docs, records = pickle.load(f)
 
@@ -20,20 +20,18 @@ def retrieve_top_k(query, k=5):
     """
     Embed the query and return top-k matching records using FAISS.
     """
-    embedding_response = client.embeddings.create(
+    q_embed = openai.embeddings.create(
         model="text-embedding-3-small",
-        input=[query]
-    )
-    q_embed = embedding_response.data[0].embedding
+        input=query
+    ).data[0].embedding
 
     D, I = index.search(np.array([q_embed]).astype("float32"), k)
     return [records[i] for i in I[0]]
 
 def generate_answer(query):
-    """
-    Generate a natural language answer to a user query based on retrieved context.
-    """
-    if "where" in query.lower() and "drop" in query.lower():
+    query_lower = query.lower()
+
+    if "where" in query_lower and "drop" in query_lower:
         return (
             "📍 Samples can be dropped at:\n"
             "**Modderfontein Industrial Complex**, Standerton Avenue, via Nobel Gate, Modderfontein, Gauteng, South Africa, 1645.\n"
@@ -51,15 +49,19 @@ def generate_answer(query):
         for r in context_rows
     )
 
+    system_prompt = (
+        "You are a helpful assistant for Bionexa Lab. Use the context below to answer customer questions "
+        "about test pricing, turnaround times, sample preparation, or drop-off procedures. "
+        "Only say 'I’m not 100% sure – let me arrange a call with our support team.' "
+        "if there is truly no relevant information."
+    )
+
     messages = [
-        {"role": "system", "content": (
-            "You are a helpful assistant for Bionexa Lab. Use the context below to answer customer questions "
-            "about test pricing, turnaround times, sample preparation, or drop-off procedures. Only say 'I’m not 100% sure – let me arrange a call with our support team.' "
-            "if there is truly no relevant information.")},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}
     ]
 
-    response = client.chat.completions.create(
+    response = openai.chat.completions.create(
         model="gpt-4o",
         messages=messages
     )
