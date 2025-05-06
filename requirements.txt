@@ -1,10 +1,9 @@
+# ---- core app stack ----
 streamlit==1.45.0
 openai==1.25.1
 python-dotenv==1.0.1
-pandas==2.2.3
-numpy==2.2.5
-# libs used only while building the index --------------------------
-scikit-learn==1.4.2
-tqdm==4.67.1
-# hard‑pin because openai still needs the old interface ------------
-httpx==0.27.0
+
+# ---- data wrangling / ML ----
+pandas==2.2.3          # CSV loading & pretty tables
+numpy==2.2.5           # numerical ops
+scikit-learn==1.4.2    # NearestNeighbors vector search
