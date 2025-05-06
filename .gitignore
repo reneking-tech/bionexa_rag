@@ -21,3 +21,4 @@ __pycache__/
 
 # Secret configuration
 .streamlit/secrets.toml
+streamlit/secrets.toml
