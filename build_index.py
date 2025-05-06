@@ -1,47 +1,50 @@
-# build_index.py
-
 import pandas as pd
 import numpy as np
-import faiss
 import pickle
-from openai import OpenAI
-from dotenv import load_dotenv
+import time
 import os
+import openai
+from dotenv import load_dotenv
 
-# Load environment variables (for OpenAI key)
+# Load .env variables
 load_dotenv()
-client = OpenAI()
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Load your CSV file
 df = pd.read_csv("bionexa_tests_full_varied.csv")
 
-# 🧠 Format each row into a clearly labeled text string
+# Format each row into a clearly labeled string
 docs = df.apply(
     lambda row: (
         f"Test: {row.get('test_name', '')}, "
         f"Price: R{row.get('price_ZAR', 'N/A')}, "
-        f"Turnaround time: {row.get('turnaround_days', 'N/A')} days, "
-        f"Sample preparation: {row.get('sample_prep', '')}, "
+        f"Turnaround: {row.get('turnaround_days', 'N/A')} days, "
+        f"Sample prep: {row.get('sample_prep', '')}, "
         f"Notes: {row.get('notes', '')}"
     ),
     axis=1
 ).tolist()
 
-# 🧠 Create embeddings using OpenAI's embedding model
-embeddings = [
-    client.embeddings.create(
-        model="text-embedding-3-small",
-        input=doc
-    ).data[0].embedding for doc in docs
-]
+# Get embeddings in batches
+embeddings = []
+batch_size = 100
 
-# ⚙️ Set up FAISS index (L2 distance)
-dim = len(embeddings[0])
-index = faiss.IndexFlatL2(dim)
-index.add(np.array(embeddings).astype("float32"))
+for i in range(0, len(docs), batch_size):
+    batch = docs[i:i+batch_size]
+    print(f"Embedding batch {i} to {i+len(batch)}...")
+    try:
+        response = openai.embeddings.create(
+            model="text-embedding-3-small",
+            input=batch
+        )
+        embeddings.extend([r.embedding for r in response.data])
+    except Exception as e:
+        print(f"❌ Error embedding batch {i}-{i+len(batch)}: {e}")
+        break
+    time.sleep(1)  # Respect OpenAI rate limits
 
-# 💾 Save index, documents, and original records
+# Save embeddings and metadata
 with open("kb.pkl", "wb") as f:
-    pickle.dump((index, docs, df.to_dict("records")), f)
+    pickle.dump((embeddings, docs, df.to_dict("records")), f)
 
-print(f"✅ Vector store built and saved with {len(docs)} records.")
+print(f"✅ Saved {len(embeddings)} embeddings.")
