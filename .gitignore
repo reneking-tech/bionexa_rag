@@ -1,3 +1,19 @@
-.env
+# Python virtual environments
 .venv/
+venv/
+
+# Environment variables
+.env
+
+# macOS system files
 .DS_Store
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
