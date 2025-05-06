@@ -1,12 +1,11 @@
 # app.py
 
 import streamlit as st
-import rag
 from rag import generate_answer
 import openai
 
-
-open.api_key = st.secrets["OPENAI_API_KEY"]
+# Set OpenAI API key from Streamlit secrets
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="Bionexa Assistant", page_icon="🧪")
 
@@ -20,6 +19,5 @@ if query:
     response = generate_answer(query)
     st.chat_message("assistant").markdown(response)
 
-    # Add support call link if needed
-    if response.startswith("I’m not 100 % sure"):
+    if response.startswith("I’m not 100% sure"):
         st.link_button("📞 Schedule a call", "https://calendly.com/your-support-team")

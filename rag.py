@@ -1,21 +1,13 @@
 # rag.py
 
-import os
 import numpy as np
 import pickle
-import streamlit as st
-from openai import OpenAI
+import openai
 from dotenv import load_dotenv
+import os
 
-# Load .env if running locally; otherwise use Streamlit secrets on Cloud
-if not st.secrets.get("OPENAI_API_KEY"):
-    load_dotenv()
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-else:
-    openai_api_key = st.secrets["OPENAI_API_KEY"]
-
-# Initialize OpenAI client
-client = OpenAI(api_key=openai_api_key)
+# Only needed locally, not on Streamlit Cloud
+load_dotenv()
 
 # Load saved FAISS index, raw documents, and full record rows
 with open("kb.pkl", "rb") as f:
@@ -25,7 +17,7 @@ def retrieve_top_k(query, k=5):
     """
     Embed the query and return top-k matching records using FAISS.
     """
-    q_embed = client.embeddings.create(
+    q_embed = openai.embeddings.create(
         model="text-embedding-3-small",
         input=query
     ).data[0].embedding
@@ -36,7 +28,6 @@ def retrieve_top_k(query, k=5):
 def generate_answer(query):
     query_lower = query.lower()
 
-    # OPTIONAL: fallback hardcoded rule (can be removed if CSV entry is solid)
     if "where" in query_lower and "drop" in query_lower:
         return (
             "📍 Samples can be dropped at:\n"
@@ -45,10 +36,8 @@ def generate_answer(query):
             "Ensure all bottles are clearly labeled before delivery."
         )
 
-    # 🔍 Top-k retrieval
     context_rows = retrieve_top_k(query, k=5)
 
-    # Format context nicely
     context = "\n".join(
         f"• Test: {r.get('test_name', '')} | Price: R{r.get('price_ZAR', 'N/A')} | "
         f"Turnaround: {r.get('turnaround_days', 'N/A')} days | "
@@ -57,7 +46,6 @@ def generate_answer(query):
         for r in context_rows
     )
 
-    # 🧠 System prompt tailored to include drop-off instructions
     system_prompt = (
         "You are a helpful assistant for Bionexa Lab. Use the context below to answer customer questions "
         "about test pricing, turnaround times, sample preparation, or drop-off procedures. "
@@ -71,9 +59,9 @@ def generate_answer(query):
         {"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}
     ]
 
-    response = client.chat.completions.create(
-        model="gpt-4o",  # or "gpt-3.5-turbo"
+    response = openai.chat.completions.create(
+        model="gpt-4o",
         messages=messages
     )
 
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content
