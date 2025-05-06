@@ -3,6 +3,10 @@
 import streamlit as st
 import rag
 from rag import generate_answer
+import openai
+
+
+open.api_key = st.secrets["OPENAI_API_KEY"]
 
 st.set_page_config(page_title="Bionexa Assistant", page_icon="🧪")
 
