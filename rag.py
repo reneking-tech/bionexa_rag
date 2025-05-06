@@ -1,37 +1,28 @@
 # rag.py
 
 import os
-import numpy as np
 import pickle
+import numpy as np
 import openai
 from dotenv import load_dotenv
 
-# Load environment variables (only needed locally)
 load_dotenv()
-
-# Set the OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Load saved FAISS index, raw documents, and full record rows
+# load the index, embeddings array, and raw records
 with open("kb.pkl", "rb") as f:
-    index, docs, records = pickle.load(f)
+    EMBS, RECORDS, NN = pickle.load(f)
 
 def retrieve_top_k(query, k=5):
-    """
-    Embed the query and return top-k matching records using FAISS.
-    """
-    q_embed = openai.embeddings.create(
-        model="text-embedding-3-small",
-        input=query
-    ).data[0].embedding
+    resp = openai.Embedding.create(model="text-embedding-3-small", input=query)
+    q_emb = np.array(resp["data"][0]["embedding"], dtype="float32")
+    dists, idxs = NN.kneighbors([q_emb], n_neighbors=k)
+    return [RECORDS[i] for i in idxs[0]]
 
-    D, I = index.search(np.array([q_embed]).astype("float32"), k)
-    return [records[i] for i in I[0]]
-
-def generate_answer(query):
-    query_lower = query.lower()
-
-    if "where" in query_lower and "drop" in query_lower:
+def generate_answer(query: str) -> str:
+    ql = query.lower()
+    # simple rule‐based fallback
+    if "where" in ql and "drop" in ql:
         return (
             "📍 Samples can be dropped at:\n"
             "**Modderfontein Industrial Complex**, Standerton Avenue, via Nobel Gate, Modderfontein, Gauteng, South Africa, 1645.\n"
@@ -39,31 +30,25 @@ def generate_answer(query):
             "Ensure all bottles are clearly labeled before delivery."
         )
 
-    context_rows = retrieve_top_k(query, k=5)
-
+    # retrieve context
+    rows = retrieve_top_k(query, k=5)
     context = "\n".join(
-        f"• Test: {r.get('test_name', '')} | Price: R{r.get('price_ZAR', 'N/A')} | "
-        f"Turnaround: {r.get('turnaround_days', 'N/A')} days | "
-        f"Sample prep: {str(r.get('sample_prep') or '')} | "
-        f"Notes: {str(r.get('notes') or '')}"
-        for r in context_rows
+        f"• Test: {r.get('test_name','')} | Price: R{r.get('price_ZAR','')} | "
+        f"Turnaround: {r.get('turnaround_days','')} days | Prep: {r.get('sample_prep','')} | "
+        f"Notes: {r.get('notes','')}"
+        for r in rows
     )
 
-    system_prompt = (
+    system = (
         "You are a helpful assistant for Bionexa Lab. Use the context below to answer customer questions "
         "about test pricing, turnaround times, sample preparation, or drop-off procedures. "
-        "Only say 'I’m not 100% sure – let me arrange a call with our support team.' "
-        "if there is truly no relevant information."
+        "If the context includes a physical address or instructions for sample delivery, include those clearly. "
+        "If you can’t find an answer, say “I’m not 100% sure – let me arrange a call with our support team.”"
     )
-
     messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}
+        {"role": "system", "content": system},
+        {"role": "user",   "content": f"Question: {query}\n\nContext:\n{context}"}
     ]
 
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=messages
-    )
-
-    return response.choices[0].message.content
+    resp = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages)
+    return resp.choices[0].message.content
